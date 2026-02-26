@@ -319,16 +319,22 @@ class GridBot:
                 logger.info(f"  [DRY-RUN] {side_name} {qty:.4f} BTC @ ${price:,.2f} ({spread*100:.2f}%)")
             return num_tiers
 
-        # Build orders
+        # Build orders — skip tiers with quantity < 0.0001 BTC
+        MIN_QTY = 0.0001
         orders = []
+        tier_indices = []  # track which tier each order belongs to
         order_flags = OrderFlags.PostOnly if self.use_post_only else None
-        for ratio, spread in zip(self.order_ratios, spreads):
+        for i, (ratio, spread) in enumerate(zip(self.order_ratios, spreads)):
             usd = self.order_size_usd * ratio
             if side == "BUY":
                 price = round(mid * (1 - spread), 2)
             else:
                 price = round(mid * (1 + spread), 2)
-            qty = round(usd / price, 4)  # BTC quantity to 4 decimals
+            qty = round(usd / price, 4)
+
+            if qty < MIN_QTY:
+                logger.debug(f"  Skip tier {i+1}: ${usd:.1f} → {qty} BTC < {MIN_QTY}")
+                continue
 
             orders.append(
                 CreateOrder(
@@ -340,6 +346,11 @@ class GridBot:
                     order_flags=order_flags,
                 )
             )
+            tier_indices.append(i)
+
+        if not orders:
+            logger.warning(f"No valid {side_name} orders (all tiers below {MIN_QTY} BTC)")
+            return 0
 
         try:
             response = self.client.batch_orders(orders)
@@ -347,6 +358,7 @@ class GridBot:
             now = time.time()
             spread_log = []
             for i, result in enumerate(response.orders):
+                tier_idx = tier_indices[i]
                 if hasattr(result, "orderId"):
                     tracked = TrackedOrder(
                         order_id=result.orderId,
@@ -354,15 +366,15 @@ class GridBot:
                         side=side,
                         price=float(orders[i].price),
                         quantity=float(orders[i].quantity),
-                        tier=i,
+                        tier=tier_idx,
                         placed_at=now,
                     )
                     self.tracked_orders[result.orderId] = tracked
                     placed += 1
                     sign = "-" if side == "BUY" else "+"
-                    spread_log.append(f"{sign}{spreads[i]*100:.2f}%@{int(orders[i].price):,}")
+                    spread_log.append(f"{sign}{spreads[tier_idx]*100:.2f}%@{int(orders[i].price):,}")
                 elif hasattr(result, "errorCode"):
-                    logger.warning(f"  Tier {i+1} error: {result.errorCode} - {result.message}")
+                    logger.warning(f"  Tier {tier_idx+1} error: {result.errorCode} - {result.message}")
 
             if spread_log:
                 logger.info(f"[ORDER] {side_name}({placed}/{num_tiers}): {'  '.join(spread_log)}")

@@ -1,0 +1,44 @@
+symbol: "BTC/USDT-P"
+
+# --- 주문 설정 ---
+order:
+  order_size_usd: 500        # 총 주문 크기 (USD) - 5 티어에 분배됨
+  max_fees_percent: 0.001    # 최대 수수료 (0.1%)
+  use_post_only: true        # PostOnly → maker fee만 지불
+  max_open_orders: 50        # 최대 오픈 주문 수
+  order_expiry_minutes: 15   # 주문 만료 시간 (분) - 이 시간 지나면 자동 취소
+
+# --- 스프레드 설정 (5 티어) ---
+spread:
+  # 각 티어별 mid price 대비 스프레드 (%)
+  buy_spreads:  [0.10, 0.20, 0.30, 0.40, 0.50]
+  sell_spreads: [0.10, 0.20, 0.30, 0.40, 0.50]
+  # 각 티어별 주문 금액 비율 (합 = 1.0)
+  # 티어1: 50%, 티어2: 20%, 티어3~5: 각 10%
+  order_ratios: [0.50, 0.20, 0.10, 0.10, 0.10]
+
+# --- 변동성 조절 (ATR) ---
+volatility:
+  atr_interval: "5m"         # ATR 계산용 캔들 간격
+  atr_period: 14             # ATR 기간
+  base_spread: 0.001         # 기준 스프레드 (0.1%)
+  vol_multiplier_min: 0.5    # 최소 변동성 배율 (저변동 = 스프레드 축소)
+  vol_multiplier_max: 2.0    # 최대 변동성 배율 (고변동 = 스프레드 확대)
+
+# --- 인벤토리 스큐 ---
+inventory:
+  skew_multiplier: 0.25      # 포지션 비율 * 이 값만큼 스프레드 조정
+                              # 롱 보유 → BUY 스프레드 넓어짐, SELL 좁아짐
+                              # 숏 보유 → 반대
+  max_position_usd: 10000    # 최대 포지션 USD 기준
+
+# --- 안전장치 ---
+safety:
+  max_position_btc: 0.01       # 최대 포지션 BTC. 초과하면 해당 방향 주문 중단
+  max_unrealized_loss_usd: 50  # 미실현 손실 이 금액 초과 → 봇 중단
+  max_balance_usage_pct: 30    # 잔고의 N%만 사용
+
+# --- 타이밍 ---
+timing:
+  check_interval: 60           # 메인 루프 주기 (초) - 매번 주문 리프레시
+  pnl_report_interval: 300     # PnL 리포트 주기 (초)

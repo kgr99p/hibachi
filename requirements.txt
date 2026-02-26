@@ -1,0 +1,3 @@
+hibachi-xyz>=0.2.0
+pyyaml>=6.0
+python-dotenv>=1.0.0

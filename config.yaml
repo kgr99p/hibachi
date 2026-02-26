@@ -32,11 +32,11 @@ inventory:
   skew_multiplier: 0.25      # 포지션 비율 * 이 값만큼 스프레드 조정
                               # 롱 보유 → BUY 스프레드 넓어짐, SELL 좁아짐
                               # 숏 보유 → 반대
-  max_position_usd: 50       # 최대 포지션 USD
+  max_position_usd: 1500     # 최대 포지션 USD
 
 # --- 안전장치 ---
 safety:
-  max_position_btc: 0.001      # 최대 포지션 BTC (~$90). 초과하면 주문 중단
+  max_position_btc: 0.025      # 최대 포지션 BTC (~$1,687). 초과하면 주문 중단
   max_unrealized_loss_usd: 10  # 미실현 손실 $10 초과 → 봇 중단 (잔고의 10%)
   max_balance_usage_pct: 30    # 잔고의 30% = $30 사용
 

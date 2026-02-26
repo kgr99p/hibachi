@@ -158,7 +158,7 @@ class GridBot:
         if account.positions:
             for pos in account.positions:
                 if pos.symbol == self.symbol:
-                    logger.info(f"Existing position: {pos.direction} {pos.quantity} @ ${pos.openPrice}")
+                    logger.info(f"Existing position: direction='{pos.direction}' qty={pos.quantity} @ ${pos.openPrice}")
 
         # Current price
         prices = self.client.get_prices(self.symbol)
@@ -187,7 +187,9 @@ class GridBot:
             for pos in (account.positions or []):
                 if pos.symbol == self.symbol:
                     size = float(pos.quantity)
-                    if pos.direction == "SHORT":
+                    direction_raw = str(getattr(pos, 'direction', 'UNKNOWN'))
+                    logger.debug(f"Raw position: direction={direction_raw}, qty={pos.quantity}, symbol={pos.symbol}")
+                    if direction_raw.upper() == "SHORT":
                         size = -size
                     return {
                         "size": size,

@@ -253,6 +253,13 @@ class GridBot:
 
     # ─── Order Placement ─────────────────────────────────────
 
+    def _get_open_order_exposure(self) -> tuple[float, float]:
+        """Calculate total BTC exposure from open orders.
+        Returns (buy_exposure, sell_exposure) both as positive values."""
+        buy_exp = sum(t.quantity for t in self.tracked_orders.values() if t.side == "BUY")
+        sell_exp = sum(t.quantity for t in self.tracked_orders.values() if t.side == "SELL")
+        return buy_exp, sell_exp
+
     async def _place_tier_orders(
         self,
         side: str,
@@ -270,7 +277,7 @@ class GridBot:
             logger.debug(f"Skip {side_name} (need {num_tiers} slots, {self.max_open_orders - open_count} available)")
             return 0
 
-        # Position limits
+        # Position limits (USD)
         if side == "BUY" and pos_value >= self.max_position_usd:
             logger.info(f"Skip {side_name} (position ${pos_value:,.0f} >= limit ${self.max_position_usd:,.0f})")
             return 0
@@ -278,15 +285,28 @@ class GridBot:
             logger.info(f"Skip {side_name} (position ${pos_value:,.0f} <= limit -${self.max_position_usd:,.0f})")
             return 0
 
-        # BTC position limit
+        # BTC position limit — include open order exposure
         pos = self._get_position()
         pos_btc = pos["size"]
-        if side == "BUY" and pos_btc >= self.max_position_btc:
-            logger.info(f"[SAFETY] Skip {side_name} (position {pos_btc:.4f} >= {self.max_position_btc} BTC)")
-            return 0
-        if side == "SELL" and pos_btc <= -self.max_position_btc:
-            logger.info(f"[SAFETY] Skip {side_name} (position {pos_btc:.4f} <= -{self.max_position_btc} BTC)")
-            return 0
+        buy_exp, sell_exp = self._get_open_order_exposure()
+
+        # Effective exposure = current position + open orders that could fill
+        if side == "BUY":
+            effective = pos_btc + buy_exp  # if all open BUYs fill, this is max long
+            if effective >= self.max_position_btc:
+                logger.info(
+                    f"[SAFETY] Skip {side_name} (pos {pos_btc:.4f} + open_buy {buy_exp:.4f} "
+                    f"= {effective:.4f} >= {self.max_position_btc} BTC)"
+                )
+                return 0
+        if side == "SELL":
+            effective = pos_btc - sell_exp  # if all open SELLs fill, this is max short
+            if effective <= -self.max_position_btc:
+                logger.info(
+                    f"[SAFETY] Skip {side_name} (pos {pos_btc:.4f} - open_sell {sell_exp:.4f} "
+                    f"= {effective:.4f} <= -{self.max_position_btc} BTC)"
+                )
+                return 0
 
         if self.dry_run:
             for ratio, spread in zip(self.order_ratios, spreads):
@@ -480,13 +500,9 @@ class GridBot:
         # 4. Detect fills from last cycle
         await self._detect_fills()
 
-        # 5. Current open orders count
-        pending = self.client.get_pending_orders() if not self.dry_run else None
-        if pending and pending.orders:
-            buy_cnt = sum(1 for o in pending.orders if o.side == "BID")
-            sell_cnt = sum(1 for o in pending.orders if o.side == "ASK")
-        else:
-            buy_cnt = sell_cnt = 0
+        # 5. Cancel ALL existing orders before placing fresh ones
+        #    This prevents order accumulation across cycles
+        await self._cancel_all_orders()
 
         # 6. Log status
         logger.info(f"{'='*55}")
@@ -503,17 +519,16 @@ class GridBot:
         # 7. Calculate adjusted spreads
         buy_spreads, sell_spreads = self._calculate_adjusted_spreads(pos_ratio, vol_mult)
 
-        # 8. Place BUY orders
-        await self._place_tier_orders("BUY", mid, buy_spreads, buy_cnt, pos_value)
+        # 8. Place BUY orders (fresh, no existing orders)
+        await self._place_tier_orders("BUY", mid, buy_spreads, 0, pos_value)
 
-        # 9. Place SELL orders
-        await self._place_tier_orders("SELL", mid, sell_spreads, sell_cnt, pos_value)
+        # 9. Place SELL orders (fresh, no existing orders)
+        await self._place_tier_orders("SELL", mid, sell_spreads, 0, pos_value)
 
         # 10. Count orders after placement
+        buy_cnt = sum(1 for t in self.tracked_orders.values() if t.side == "BUY")
+        sell_cnt = sum(1 for t in self.tracked_orders.values() if t.side == "SELL")
         logger.info(f"[ORDERS] Open: {buy_cnt} buys, {sell_cnt} sells")
-
-        # 11. Cancel expired
-        await self._cancel_expired_orders()
 
     # ─── Main Loop ────────────────────────────────────────────
 

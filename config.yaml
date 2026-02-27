@@ -1,10 +1,10 @@
 symbol: "BTC/USDT-P"
 
-# 잔고: $100
+# 잔고: $500
 
 # --- 주문 설정 ---
 order:
-  order_size_usd: 300        # 총 주문 크기 (USD) - 5 티어에 분배됨
+  order_size_usd: 1500       # 총 주문 크기 (USD) - 5 티어에 분배됨
   max_fees_percent: 0.001    # 최대 수수료 (0.1%)
   use_post_only: true        # PostOnly → maker fee만 지불
   max_open_orders: 50        # 최대 오픈 주문 수
@@ -32,12 +32,12 @@ inventory:
   skew_multiplier: 0.25      # 포지션 비율 * 이 값만큼 스프레드 조정
                               # 롱 보유 → BUY 스프레드 넓어짐, SELL 좁아짐
                               # 숏 보유 → 반대
-  max_position_usd: 1500     # 최대 포지션 USD
+  max_position_usd: 7500     # 최대 포지션 USD
 
 # --- 안전장치 ---
 safety:
-  max_position_btc: 0.025      # 최대 포지션 BTC (~$1,687). 초과하면 주문 중단
-  max_unrealized_loss_usd: 50  # 미실현 손실 $50 초과 → 봇 중단
+  max_position_btc: 0.125      # 최대 포지션 BTC (~$8,400). 초과하면 주문 중단
+  max_unrealized_loss_usd: 250 # 미실현 손실 $250 초과 → 봇 중단
   max_balance_usage_pct: 80    # 잔고의 80% 사용
 
 # --- 타이밍 ---
